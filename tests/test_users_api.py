@@ -10,11 +10,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from vic_api.app import create_app
-from vic_api.api.deps import get_db, get_keycloak_admin_dep
-from vic_api.core.config import Settings
-from vic_api.core.db_base import Base
-from vic_api.modules.users.models import Customer, CustomerAddress, Supplier, User
+from vinc_api.app import create_app
+from vinc_api.api.deps import get_db, get_keycloak_admin_dep
+from vinc_api.core.config import Settings
+from vinc_api.core.db_base import Base
+from vinc_api.modules.users.models import Customer, CustomerAddress, Supplier, User
 
 
 TEST_JWT_SECRET = "test-secret"
@@ -85,7 +85,7 @@ def seed_data(client: TestClient) -> dict[str, str]:
         )
         address = CustomerAddress(
             id=uuid4(),
-            supplier_id=supplier.id,
+            customer_id=customer.id,
             erp_customer_id=customer.erp_customer_id,
             erp_address_id="ADDR-001",
             label="HQ",

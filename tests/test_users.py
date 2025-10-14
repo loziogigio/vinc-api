@@ -6,16 +6,19 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from vic_api.core.config import Settings
-from vic_api.core.db_base import Base
-from vic_api.modules.users.models import Customer, CustomerAddress, Supplier
-from vic_api.modules.users.schemas import (
+from vinc_api.core.config import Settings
+from vinc_api.core.db_base import Base
+from vinc_api.modules.users.models import Customer, CustomerAddress, Supplier
+from vinc_api.modules.users.schemas import (
     CustomerSelection,
+    MembershipEntry,
+    Memberships,
+    SupplierSelection,
     UserCreateRequest,
     UserRole,
     UserUpdateRequest,
 )
-from vic_api.modules.users.service import (
+from vinc_api.modules.users.service import (
     UserServiceError,
     create_user,
     serialize_user_detail,
@@ -65,7 +68,7 @@ def seed_customer(session: Session) -> tuple[Supplier, Customer, CustomerAddress
     )
     address = CustomerAddress(
         id=uuid4(),
-        supplier_id=supplier.id,
+        customer_id=customer.id,
         erp_customer_id=customer.erp_customer_id,
         erp_address_id=f"ADDR-{suffix}",
         label="HQ",
@@ -106,12 +109,47 @@ def test_create_user_assigns_links(db_session: Session) -> None:
     assert detail.customers[0].addresses[0].pricelist_code == "PL"
 
 
+def test_create_user_assigns_supplier_links(db_session: Session) -> None:
+    settings = make_settings()
+    supplier, customer, address = seed_customer(db_session)
+
+    payload = UserCreateRequest(
+        email="supplier-link@example.com",
+        name="Supplier Link",
+        role=UserRole.AGENT,
+        customers=[
+            CustomerSelection(
+                customer_id=str(customer.id),
+                all_addresses=False,
+                address_ids=[str(address.id)],
+            )
+        ],
+        suppliers=[
+            SupplierSelection(
+                supplier_id=str(supplier.id),
+                role="admin",
+            )
+        ],
+        send_invite=False,
+    )
+
+    user = create_user(db_session, payload, settings=settings)
+
+    assert [(link.supplier_id, link.role) for link in user.supplier_links] == [
+        (supplier.id, "admin")
+    ]
+
+    detail = serialize_user_detail(user)
+    assert detail.suppliers and detail.suppliers[0].id == supplier.id
+    assert detail.suppliers[0].role == "admin"
+
+
 def test_create_user_with_all_addresses(db_session: Session) -> None:
     settings = make_settings()
     supplier, customer, address = seed_customer(db_session)
     second_address = CustomerAddress(
         id=uuid4(),
-        supplier_id=supplier.id,
+        customer_id=customer.id,
         erp_customer_id=customer.erp_customer_id,
         erp_address_id=f"ADDR-{uuid4().hex[:8]}",
         label="Branch",
@@ -196,6 +234,51 @@ def test_create_user_requires_unique_email(db_session: Session) -> None:
 
     with pytest.raises(UserServiceError):
         create_user(db_session, payload, settings=settings)
+
+
+def test_create_supplier_admin_membership_without_customers(
+    db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    settings = make_settings()
+    supplier = Supplier(
+        id=uuid4(),
+        name="Solo Supplier",
+        slug=f"solo-{uuid4().hex[:8]}",
+        is_active=True,
+    )
+    db_session.add(supplier)
+    db_session.flush()
+
+    async def fake_persist(doc):
+        return doc
+
+    monkeypatch.setattr(
+        "vinc_api.modules.users.service.persist_membership_doc",
+        fake_persist,
+    )
+
+    payload = UserCreateRequest(
+        email="supplier-admin@example.com",
+        name="Supplier Admin",
+        role=UserRole.SUPPLIER_ADMIN,
+        memberships=Memberships(
+            memberships=[
+                MembershipEntry(
+                    scope_type="supplier",
+                    scope_id=str(supplier.id),
+                    role="supplier_admin",
+                    reseller_scope="all",
+                    address_scope="all",
+                )
+            ]
+        ),
+    )
+
+    user = create_user(db_session, payload, settings=settings)
+
+    assert user.role == UserRole.SUPPLIER_ADMIN.value
+    assert not user.customer_links
+    assert not user.address_links
 
 
 def test_serialize_user_me_includes_addresses(db_session: Session) -> None:

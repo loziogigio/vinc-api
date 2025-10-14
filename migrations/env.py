@@ -13,9 +13,9 @@ SRC_PATH = PROJECT_ROOT / "src"
 if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
-from vic_api.core.config import get_settings  # noqa: E402
-from vic_api.core.db_base import Base  # noqa: E402
-from vic_api.modules.users import models as _  # noqa: F401,E402 - ensure models are imported
+from vinc_api.core.config import get_settings  # noqa: E402
+from vinc_api.core.db_base import Base  # noqa: E402
+from vinc_api.modules.users import models as _  # noqa: F401,E402 - ensure models are imported
 
 config = context.config
 

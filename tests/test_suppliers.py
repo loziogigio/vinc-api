@@ -6,17 +6,17 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from vic_api.core.db_base import Base
-from vic_api.modules.users.models import Customer, CustomerAddress, Supplier
-from vic_api.modules.suppliers.schemas import SupplierCreate, SupplierUpdate
-from vic_api.modules.suppliers.service import (
+from vinc_api.core.db_base import Base
+from vinc_api.modules.users.models import Customer, CustomerAddress, Supplier
+from vinc_api.modules.suppliers.schemas import SupplierCreate, SupplierUpdate
+from vinc_api.modules.suppliers.service import (
     create_supplier,
     get_supplier,
     list_suppliers,
     list_suppliers_for_user,
     update_supplier,
 )
-from vic_api.modules.users.models import User, UserAddressLink
+from vinc_api.modules.users.models import User, UserAddressLink
 
 
 @pytest.fixture()
@@ -32,6 +32,7 @@ def test_create_supplier_generates_slug(db_session: Session) -> None:
     payload = SupplierCreate(name="DFL S.r.l.")
     supplier = create_supplier(db_session, payload)
     assert supplier.slug == "dfl-s-r-l"
+    assert supplier.status == "active"
     fetched = get_supplier(db_session, supplier.id)
     assert fetched.id == supplier.id
 
@@ -44,10 +45,12 @@ def test_update_supplier_changes_fields(db_session: Session) -> None:
     update_supplier(
         db_session,
         supplier.id,
-        SupplierUpdate(legal_name="New Name", is_active=False),
+        SupplierUpdate(legal_name="New Name", tax_id="VAT-NEW", status="suspended", is_active=False),
     )
     refreshed = get_supplier(db_session, supplier.id)
     assert refreshed.legal_name == "New Name"
+    assert refreshed.tax_id == "VAT-NEW"
+    assert refreshed.status == "suspended"
     assert not refreshed.is_active
 
 
@@ -61,7 +64,7 @@ def test_list_suppliers_for_user(db_session: Session) -> None:
     )
     address = CustomerAddress(
         id=uuid4(),
-        supplier_id=supplier.id,
+        customer_id=customer.id,
         erp_customer_id=customer.erp_customer_id,
         erp_address_id="A1",
         label="HQ",

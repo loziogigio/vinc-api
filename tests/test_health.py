@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
-from vic_api.app import create_app
-from vic_api.core.config import Settings
+from vinc_api.app import create_app
+from vinc_api.core.config import Settings
 
 
 def test_health():

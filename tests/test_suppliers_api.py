@@ -10,11 +10,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from vic_api.app import create_app
-from vic_api.api.deps import get_db, get_keycloak_admin_dep
-from vic_api.core.config import Settings
-from vic_api.core.db_base import Base
-from vic_api.modules.users.models import Customer, CustomerAddress, Supplier, User, UserAddressLink
+from vinc_api.app import create_app
+from vinc_api.api.deps import get_db, get_keycloak_admin_dep
+from vinc_api.core.config import Settings
+from vinc_api.core.db_base import Base
+from vinc_api.modules.users.models import Customer, CustomerAddress, Supplier, User, UserAddressLink
 
 TEST_SECRET = "test-secret"
 
@@ -78,7 +78,12 @@ def client() -> Generator[TestClient, None, None]:
 
 def seed_supplier(SessionLocal) -> dict[str, str]:
     with SessionLocal() as session:
-        supplier = Supplier(id=uuid4(), name="Supplier", slug="supplier")
+        supplier = Supplier(
+            id=uuid4(),
+            name="Supplier",
+            slug="supplier",
+            status="active",
+        )
         customer = Customer(
             id=uuid4(),
             supplier_id=supplier.id,
@@ -87,7 +92,7 @@ def seed_supplier(SessionLocal) -> dict[str, str]:
         )
         address = CustomerAddress(
             id=uuid4(),
-            supplier_id=supplier.id,
+            customer_id=customer.id,
             erp_customer_id=customer.erp_customer_id,
             erp_address_id="A1",
             label="HQ",
@@ -120,13 +125,20 @@ def seed_supplier(SessionLocal) -> dict[str, str]:
 def test_super_admin_can_create_supplier(client: TestClient) -> None:
     response = client.post(
         "/api/v1/suppliers",
-        json={"name": "DFL S.r.l."},
+        json={
+            "name": "DFL S.r.l.",
+            "legal_email": "legal@example.com",
+            "tax_id": "VAT123456",
+        },
         headers=auth_headers("super_admin"),
     )
     assert response.status_code == 201
     body = response.json()
     assert body["name"] == "DFL S.r.l."
     assert body["slug"] == "dfl-s-r-l"
+    assert body["status"] == "active"
+    assert body["legal_email"] == "legal@example.com"
+    assert body["tax_id"] == "VAT123456"
 
 
 def test_supplier_me_returns_accessible_suppliers(client: TestClient) -> None:
