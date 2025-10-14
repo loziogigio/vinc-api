@@ -117,17 +117,27 @@ def list_users_endpoint(
 @router.post("/", response_model=UserCreatedResponse, status_code=http_status.HTTP_201_CREATED)
 def create_user_endpoint(
     payload: UserCreateRequest,
+    request: Request,
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings_dep),
     keycloak_admin=Depends(get_keycloak_admin_dep),
-    _: str = Depends(require_roles("supplier_admin", "super_admin")),
+    user_role: str = Depends(require_roles("supplier_admin", "super_admin")),
 ) -> UserCreatedResponse:
+    # Extract supplier_id from X-Tenant-ID header when creating user in supplier scope
+    is_super_admin = user_role == "super_admin"
+    tenant_supplier_id = _require_tenant_scope(request, is_super_admin=is_super_admin, db=db)
+
+    # For supplier admins, the user.supplier_id should be set to the tenant supplier
+    # This tracks which supplier created the user
+    supplier_id = tenant_supplier_id if not is_super_admin else None
+
     try:
         user = create_user(
             db,
             payload,
             settings=settings,
             keycloak_admin=keycloak_admin,
+            supplier_id=supplier_id,
         )
     except UserServiceError as exc:
         raise HTTPException(status_code=int(exc.status_code), detail=exc.detail)

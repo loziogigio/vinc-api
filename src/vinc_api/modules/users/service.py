@@ -114,7 +114,16 @@ def create_user(
     *,
     settings: Settings,
     keycloak_admin: Optional[KeycloakAdmin] = None,
+    supplier_id: Optional[UUID] = None,
 ) -> User:
+    """
+    Create a new user.
+
+    Args:
+        supplier_id: Optional supplier ID to set on user.supplier_id field.
+                     This tracks which supplier created the user.
+                     Should be set when supplier_admin creates a user (from X-Tenant-ID).
+    """
     context = _build_context_for_create(db, payload)
 
     role_value = _resolve_role(payload.role, context.membership_doc)
@@ -128,6 +137,7 @@ def create_user(
         name=payload.name,
         role=role_value,
         status=UserStatus.INVITED.value,
+        supplier_id=supplier_id,  # Track which supplier created this user
     )
 
     _assign_links(user, context.customer_ids, context.address_ids, context.supplier_links)
