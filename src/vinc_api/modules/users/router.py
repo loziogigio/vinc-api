@@ -7,6 +7,8 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from fastapi import status as http_status
 from sqlalchemy.orm import Session
 
+from vinc_api.modules.customers.router import _require_tenant_scope
+
 from ...api.deps import (
     get_db,
     get_keycloak_admin_dep,
@@ -63,83 +65,28 @@ def list_users_endpoint(
     supplier_id: UUID | None = Query(None, description="Filter by supplier (super_admin only)"),
     request: Request = None,
     db: Session = Depends(get_db),
-    user_role: str = Depends(require_roles("supplier_admin", "super_admin")),
+    user_role: str = Depends(require_roles("supplier_admin",  "supplier_helpdesk" , "super_admin")),
 ) -> UserListResponse:
     """
     List users with pagination, search, and filters.
 
-    Role-based access control:
-    - Super admins: Can filter by supplier_id query parameter OR see all users globally
-    - Supplier admins: MUST use X-Tenant-ID header, cannot use supplier_id parameter
+    Access control:
+    - super_admin: Can filter by supplier_id parameter or see all users globally
+    - supplier_admin/supplier_helpdesk: Scoped to their X-Tenant-ID supplier
 
-    Returns user list with link counts for efficient table display.
+    Returns paginated user list with link counts.
     """
-    # Get the authenticated user's role
     is_super_admin = user_role == "super_admin"
 
-    # Determine the effective supplier filter based on role
-    effective_supplier_id = None
+    # Validate tenant scope (requires X-Tenant-ID for non-super admins)
+    tenant_supplier_id = _require_tenant_scope(request, is_super_admin=is_super_admin, db=db)
 
-    if is_super_admin:
-        # Super admin can use supplier_id query parameter to filter
-        # If not provided, they see all users globally
-        effective_supplier_id = supplier_id
-    else:
-        # Supplier admin MUST use X-Tenant-ID and cannot override with supplier_id
-        # Reject if supplier_id query parameter is provided
-        if supplier_id is not None:
-            raise HTTPException(
-                status_code=http_status.HTTP_403_FORBIDDEN,
-                detail="Supplier admins cannot filter by supplier_id. Use X-Tenant-ID header instead."
-            )
+    # Super admins can filter by supplier_id, others use their tenant scope
+    effective_supplier_id = supplier_id if (is_super_admin and supplier_id is not None) else tenant_supplier_id
 
-        # Get tenant ID from X-Tenant-ID header
-        tenant_id = getattr(request.state, "tenant_id", None)
-        if not tenant_id:
-            raise HTTPException(
-                status_code=http_status.HTTP_400_BAD_REQUEST,
-                detail="X-Tenant-ID header is required for supplier admins"
-            )
 
-        try:
-            effective_supplier_id = UUID(tenant_id)
-        except (ValueError, TypeError):
-            raise HTTPException(
-                status_code=http_status.HTTP_400_BAD_REQUEST,
-                detail="Invalid X-Tenant-ID format"
-            )
 
-        # SECURITY: Validate X-Tenant-ID against user_supplier_link table
-        # This prevents supplier admins from accessing other suppliers' users by changing the header
-        user_sub = getattr(request.state, "user_sub", None)
-        if not user_sub:
-            raise HTTPException(
-                status_code=http_status.HTTP_403_FORBIDDEN,
-                detail="Access denied: User identity not found"
-            )
 
-        # Query database for user and check supplier link
-        from .models import User, UserSupplierLink
-        current_user = db.query(User).filter(User.kc_user_id == user_sub).first()
-        if not current_user:
-            raise HTTPException(
-                status_code=http_status.HTTP_403_FORBIDDEN,
-                detail="Access denied: User not found"
-            )
-
-        # Check if user has active link to the supplier
-        link = db.query(UserSupplierLink).filter(
-            UserSupplierLink.user_id == current_user.id,
-            UserSupplierLink.supplier_id == effective_supplier_id,
-            UserSupplierLink.status == "active",
-            UserSupplierLink.is_active == True
-        ).first()
-
-        if not link:
-            raise HTTPException(
-                status_code=http_status.HTTP_403_FORBIDDEN,
-                detail="Access denied: Not authorized for this supplier team"
-            )
 
     users, total = list_users_paginated(
         db,
