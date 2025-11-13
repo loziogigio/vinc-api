@@ -19,3 +19,7 @@ opentelemetry-instrumentation-sqlalchemy>=0.46b0
 opentelemetry-instrumentation-redis>=0.46b0
 opentelemetry-instrumentation-pymongo>=0.46b0
 email-validator>=2.3.0
+# Payment processing
+stripe>=7.0.0
+cryptography>=41.0.0
+pytest-asyncio>=0.21.0
