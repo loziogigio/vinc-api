@@ -546,3 +546,61 @@ async def nexi_webhook(
     headers = dict(request.headers)
     handler = NexiWebhookHandler(db)
     return await handler.handle(body, nexi_signature, headers)
+
+
+@router.post(
+    "/webhooks/banca-sella",
+    summary="Banca Sella webhook",
+    description="Handle Banca Sella webhook events",
+    include_in_schema=False,  # Don't show in OpenAPI docs
+)
+async def banca_sella_webhook(
+    request: Request,
+    banca_sella_signature: str = Header(None, alias="X-Sella-Signature"),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    """Handle Banca Sella webhooks.
+
+    Args:
+        request: FastAPI request
+        banca_sella_signature: Banca Sella signature header
+        db: Database session
+
+    Returns:
+        Success response
+    """
+    from .webhooks.banca_sella import BancaSellaWebhookHandler
+
+    body = await request.body()
+    headers = dict(request.headers)
+    handler = BancaSellaWebhookHandler(db)
+    return await handler.handle(body, banca_sella_signature, headers)
+
+
+@router.post(
+    "/webhooks/scalapay",
+    summary="Scalapay webhook",
+    description="Handle Scalapay webhook events",
+    include_in_schema=False,  # Don't show in OpenAPI docs
+)
+async def scalapay_webhook(
+    request: Request,
+    scalapay_signature: str = Header(None, alias="X-Scalapay-Signature"),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    """Handle Scalapay webhooks.
+
+    Args:
+        request: FastAPI request
+        scalapay_signature: Scalapay signature header
+        db: Database session
+
+    Returns:
+        Success response
+    """
+    from .webhooks.scalapay import ScalapayWebhookHandler
+
+    body = await request.body()
+    headers = dict(request.headers)
+    handler = ScalapayWebhookHandler(db)
+    return await handler.handle(body, scalapay_signature, headers)
