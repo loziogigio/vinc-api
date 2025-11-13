@@ -517,3 +517,32 @@ async def paypal_webhook(
     headers = dict(request.headers)
     handler = PayPalWebhookHandler(db)
     return await handler.handle(body, headers)
+
+
+@router.post(
+    "/webhooks/nexi",
+    summary="Nexi webhook",
+    description="Handle Nexi webhook events",
+    include_in_schema=False,  # Don't show in OpenAPI docs
+)
+async def nexi_webhook(
+    request: Request,
+    nexi_signature: str = Header(None, alias="X-Nexi-Signature"),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    """Handle Nexi webhooks.
+
+    Args:
+        request: FastAPI request
+        nexi_signature: Nexi MAC signature header
+        db: Database session
+
+    Returns:
+        Success response
+    """
+    from .webhooks.nexi import NexiWebhookHandler
+
+    body = await request.body()
+    headers = dict(request.headers)
+    handler = NexiWebhookHandler(db)
+    return await handler.handle(body, nexi_signature, headers)
