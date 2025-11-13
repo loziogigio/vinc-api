@@ -1,6 +1,7 @@
 """Webhook handlers for payment providers."""
 
-from .stripe import StripeWebhookHandler
+from .nexi import NexiWebhookHandler
 from .paypal import PayPalWebhookHandler
+from .stripe import StripeWebhookHandler
 
-__all__ = ["StripeWebhookHandler", "PayPalWebhookHandler"]
+__all__ = ["StripeWebhookHandler", "PayPalWebhookHandler", "NexiWebhookHandler"]

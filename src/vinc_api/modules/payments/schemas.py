@@ -77,6 +77,15 @@ class PaymentMethodType(str, Enum):
     DIGITAL_WALLET = "digital_wallet"
 
 
+class PaymentType(str, Enum):
+    """Types of payment transactions."""
+
+    STANDARD = "standard"  # Standard one-time payment
+    RECURRENT = "recurrent"  # Recurring/subscription payment
+    MOTO = "moto"  # Mail Order/Telephone Order
+    ONE_CLICK = "one_click"  # One-click payment with saved card
+
+
 # Request Schemas
 
 
@@ -174,6 +183,18 @@ class CreatePaymentIntentRequest(BaseModel):
     currency: str = Field(default="EUR", max_length=3)
     customer_email: str
     customer_id: UUID | None = None
+    payment_type: PaymentType = Field(
+        default=PaymentType.STANDARD,
+        description="Type of payment (standard, recurrent, moto, one_click)",
+    )
+    saved_card_id: str | None = Field(
+        default=None,
+        description="Saved card ID for one-click payments",
+    )
+    save_card: bool = Field(
+        default=False,
+        description="Save card for future one-click payments",
+    )
     metadata: dict[str, Any] = Field(
         default_factory=dict,
         description="Additional metadata",

@@ -755,9 +755,20 @@ class PaymentService:
         credentials = self.encryption.decrypt(tenant_provider.credentials)
 
         # Get provider class
+        from .providers import (
+            BancaSellaProvider,
+            BankTransferProvider,
+            NexiProvider,
+            ScalapayProvider,
+        )
+
         provider_map = {
             "stripe": StripeProvider,
             "paypal": PayPalProvider,
+            "nexi": NexiProvider,
+            "banca_sella": BancaSellaProvider,
+            "scalapay": ScalapayProvider,
+            "bank_transfer": BankTransferProvider,
         }
 
         provider_class = provider_map.get(tenant_provider.provider)
